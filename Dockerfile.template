@@ -13,6 +13,7 @@ COPY package.json package.json
 RUN JOBS=MAX npm install --production --unsafe-perm && npm cache verify && rm -rf /tmp/*
 
 COPY . ./
+COPY .asoundrc /root/.asoundrc
 
 ENV UDEV=1
 
