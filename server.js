@@ -6,38 +6,58 @@ var express = require('express');
 var app = express();
 var dir = path.join(__dirname, 'public');
 app.use(express.static(dir));
-app.listen(3000, function () {
+app.listen(3000, () => {
 	console.log('Listening on http://localhost:3000/');
 });
 
-async function sleep(ms) {
-	return await new Promise(resolve => setTimeout(resolve, ms));
+async function getExecutablePath() {
+	if (process.platform === 'darwin') return '/Applications/Chromium.app/Contents/MacOS/Chromium';
+	return '/usr/bin/chromium-browser';
 }
 
 async function getConfig() {
+	const path = await getExecutablePath();
 	return {
-		executablePath: '/usr/bin/chromium-browser',
+		executablePath: path,
 		args: [
 			'--no-sandbox',
 			'--use-fake-ui-for-media-stream',
+			'--incognito',
 		]
 	}
 }
+
+async function clickByText (page, text) {
+	for (let i = 0; i < 10; i++) {
+		const elementsWithText = await page.$x(`//*[contains(text(), '${text}')]`);
+		if (elementsWithText.length < 1) {
+			console.log(`Didn't find '${text}' yet, waiting...`);
+			await page.waitFor(250);
+		} else {
+			return elementsWithText[0].click();
+		}
+	}
+	throw new Error(`Link not found, even after waiting: '${text}'`);
+};
 
 (async () => {
 	try {
 		const config = await getConfig();
 		const browser = await puppeteer.launch(config);
 		const page = await browser.newPage();
-
 		const URL = 'https://meet.google.com/rfn-pdbt-wvj';
+		await page.goto(URL, {waitUntil: 'networkidle2'});
 		console.log(`Joined: ${URL}`);
-		await page.goto(URL);
+		await clickByText(page, 'Your name');
+		await page.keyboard.type(`tob-${Math.random().toString(36).substring(11)}`);
+		await page.waitFor(500);
+		await page.keyboard.type(String.fromCharCode(9));
+		await page.waitFor(500);
+		await page.keyboard.type(String.fromCharCode(13));
 
-		//await page.waitForNavigation();
 		while (true) {
 			await page.screenshot({ path: "./public/test.png" });
-			await sleep(2000);
+			await page.waitFor(10000);
 		}
 	} catch (err) {
 		console.error(err);
